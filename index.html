@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>戰爭或動亂國家的性與生殖能力探討</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- D3.js for interactive map -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* 淺灰色背景 */
+            color: #333; /* 深灰色文字 */
+        }
+        /* 當模態框開啟時，禁用 body 的滾動 */
+        body.modal-open {
+            overflow: hidden;
+        }
+        .container {
+            max-width: 900px; /* 內容最大寬度 */
+        }
+        /* 地圖樣式 */
+        .country {
+            fill: #ccc;
+            stroke: #fff;
+            stroke-width: 0.5px;
+            pointer-events: all; /* 確保所有點擊事件都被捕獲 */
+        }
+        .country.highlight {
+            fill: #ef4444; /* 紅色-500 for highlighted countries */
+            cursor: pointer;
+        }
+        .country.highlight:hover {
+            fill: #dc2626; /* 更深的紅色 on hover */
+        }
+        /* 彈出視窗樣式 */
+        .modal {
+            display: none; /* 預設隱藏 */
+            position: fixed; /* 固定位置 */
+            z-index: 1000; /* 置於頂層 */
+            left: 0;
+            top: 0;
+            width: 100%; /* 全寬 */
+            height: 100%; /* 全高 */
+            background-color: rgba(0,0,0,0.4); /* 黑色半透明背景 */
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto; /* 確保在 flex 容器中居中 */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            max-height: 80vh; /* 彈出視窗內容最大高度 */
+            overflow-y: auto; /* 彈出視窗內容啟用滾動 */
+        }
+        .back-to-map-button {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            /* Tailwind classes applied directly in HTML for styling */
+        }
+        /* 確保 map-container 具有相對定位，以便內部絕對定位的圖片能正確定位 */
+        #map-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="container mx-auto bg-white shadow-lg rounded-xl p-6 sm:p-10">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-6 text-indigo-700">戰爭或動亂國家的性與生殖能力探討</h1>
+        <p class="text-lg mb-4 text-gray-700 leading-relaxed text-center">
+            戰爭和衝突對人類生活的各個方面產生深遠影響，其中也包括個人和社會層面的性與生殖健康。
+            本頁面將探討在戰爭或其陰影下，性趣、生殖能力以及相關社會現象的變化，並以特定國家為例進行分析。
+            我們將從心理、社會、經濟和醫療等多角度審視這一複雜議題。
+        </p>
+
+        <!-- 互動式地圖區塊 -->
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-2 text-indigo-700 mt-4">互動式世界地圖</h2>
+        <p class="text-md mb-4 text-gray-700 text-center">
+            點擊地圖上標示的國家，查看其人口、生育率及相關資訊。
+        </p>
+        <div id="map-container" class="w-full overflow-hidden rounded-lg shadow-md bg-gray-100 flex justify-center items-center" style="height: 500px;">
+            <!-- 圖片放置處：在地圖SVG上方，使用絕對定位 -->
+            <img src="https://i.postimg.cc/bwVBvRNK/1753185632946.png" alt="地圖上方裝飾圖片"
+                 class="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-auto rounded-lg shadow-md z-10"
+                 onerror="this.onerror=null; this.src='https://placehold.co/160x100/A0A0A0/FFFFFF?text=Image+Error';">
+            <svg id="world-map" class="w-full h-full"></svg>
+        </div>
+
+        <!-- 國家資訊彈出視窗 -->
+        <div id="countryModal" class="modal">
+            <div class="modal-content">
+                <button class="back-to-map-button bg-amber-700 hover:bg-amber-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out" id="backToMapButton">回到地圖</button>
+                <h2 id="modalCountryName" class="text-2xl font-bold mb-4 text-indigo-700"></h2>
+                <p id="modalCountryPopulation" class="text-gray-700 mb-2"></p>
+                <p id="modalCountryFertility" class="text-gray-700 mb-2"></p>
+                <p id="modalCountryRank" class="text-gray-700 mb-4"></p>
+                <div id="modalCountryDetails" class="text-gray-600 leading-relaxed"></div>
+            </div>
+        </div>
+
+        <!-- 文獻概論區塊 -->
+        <div class="mt-10 p-6 bg-gray-50 rounded-lg shadow-md">
+            <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6 text-indigo-700">戰爭或動亂對性與生殖力影響的相關文獻概論</h2>
+            <p class="text-lg mb-4 text-gray-700 leading-relaxed">
+                關於戰爭、衝突和動亂對性與生殖健康影響的研究，是一個跨學科的領域，涵蓋了公共衛生、社會學、心理學、人道主義援助和人口學等多個視角。以下是一些主要的發現和研究主題：
+            </p>
+
+            <h3 class="text-xl font-semibold text-indigo-800 mb-2">1. 生殖健康服務中斷：</h3>
+            <p class="text-gray-700 mb-4">
+                文獻普遍指出，衝突地區的醫療基礎設施遭到破壞，醫護人員流失，導致避孕、安全分娩、產前產後護理、性傳播疾病（包括 HIV/AIDS）的預防和治療等基本生殖健康服務嚴重中斷或難以獲得。這直接導致非意願懷孕、不安全墮胎、孕產婦和新生兒死亡率上升。
+                <br><span class="text-sm text-gray-500"><em>參考文獻類型：人道主義組織報告（如 UNFPA, IRC）、公共衛生期刊文章。</em></span>
+            </p>
+
+            <h3 class="text-xl font-semibold text-indigo-800 mb-2">2. 性暴力作為戰爭武器：</h3>
+            <p class="text-gray-700 mb-4">
+                這是衝突地區一個令人髮指的普遍現象。文獻強調，強姦、性奴役和其他形式的性暴力被系統性地用於恐嚇、懲罰和控制平民。這不僅對受害者造成嚴重的身心創傷，還導致非意願懷孕、性傳播疾病的蔓延，以及社會污名化。
+                <br><span class="text-sm text-gray-500"><em>參考文獻類型：人權報告、性別研究、創傷心理學研究。</em></span>
+            </p>
+
+            <h3 class="text-xl font-semibold text-indigo-800 mb-2">3. 人口結構與生育模式的變化：</h3>
+            <p class="text-gray-700 mb-4">
+                戰爭通常會導致出生率下降，因為人們對未來的不確定性增加，經濟壓力增大，以及男性人口因戰鬥或流離失所而減少。然而，在某些長期衝突或難民營環境中，由於缺乏避孕措施、性暴力或文化壓力，也可能出現生育率相對較高的情況。大規模的人口流離失所（國內流離失所者和難民）會改變人口分佈，並對接收社區的服務造成壓力。
+                <br><span class="text-sm text-gray-500"><em>參考文獻類型：人口統計學研究、地理學研究。</em></span>
+            </p>
+
+            <h3 class="text-xl font-semibold text-indigo-800 mb-2">4. 心理社會影響：</h3>
+            <p class="text-gray-700 mb-4">
+                戰爭帶來的創傷、焦慮、抑鬱和創傷後壓力症候群（PTSD）對個人的性慾、親密關係和生育決策產生深遠影響。倖存者可能面臨親密關係困難、性功能障礙，甚至對生育後代產生恐懼。
+                <br><span class="text-sm text-gray-500"><em>參考文獻類型：心理學、精神病學期刊。</em></span>
+            </p>
+
+            <h3 class="text-xl font-semibold text-indigo-800 mb-2">5. 社會規範與性別角色的轉變：</h3>
+            <p class="text-gray-700 mb-4">
+                衝突可能導致傳統社會和家庭結構的瓦解，有時會賦予女性新的角色和責任，但也可能加劇性別不平等和對女性的剝削。童婚和早孕在不穩定環境中可能增加，作為家庭生存或保護女孩的一種策略（儘管往往適得其反）。
+                <br><span class="text-sm text-gray-500"><em>參考文獻類型：社會學、人類學、性別研究。</em></span>
+            </p>
+
+            <h3 class="text-xl font-semibold text-indigo-800 mb-2">6. 長期影響與恢復：</h3>
+            <p class="text-gray-700 mb-4">
+                即使衝突結束，其對性與生殖健康的影響也可能持續數十年。重建醫療系統、提供心理支持、解決性暴力遺留問題以及促進社會和解是長期恢復的關鍵。
+                <br><span class="text-sm text-gray-500"><em>參考文獻類型：發展研究、和平與衝突研究。</em></span>
+            </p>
+
+            <p class="text-lg mt-6 text-gray-700 leading-relaxed">
+                總體而言，文獻強調了在衝突和動亂背景下，性與生殖健康是一個複雜且高度脆弱的領域，需要綜合性、以人為本且文化敏感的干預措施。
+            </p>
+        </div>
+
+        <!-- 免責聲明區塊 -->
+        <div class="mt-10 p-6 bg-gray-100 rounded-lg shadow-md border-l-4 border-red-500">
+            <h2 class="text-2xl sm:text-2xl font-bold mb-4 text-red-700">免責聲明</h2>
+            <p class="text-md text-gray-700 leading-relaxed">
+                本頁面所提供的所有資訊僅供教育和參考之用，不應被視為專業的醫療、心理或法律建議。
+                對於任何基於本頁面內容所採取的行動或決策，本站不承擔任何責任。
+                在做出任何個人健康或生活決策之前，請務必諮詢合格的專業人士。
+            </p>
+        </div>
+
+    </div>
+
+    <script>
+        // 用於突出顯示和在彈出視窗中顯示的國家數據
+        const countryData = {
+            "Ukraine": {
+                chineseName: "烏克蘭",
+                population: "約 3786 萬人 (2024)",
+                fertility: "每名婦女約 0.99 個孩子 (2024)",
+                rank: "全球最低之一 (約倒數第6位)",
+                details: `
+                    <p>烏克蘭持續的衝突對其人口結構、社會心理和生殖健康帶來了巨大挑戰。戰爭導致大規模人口流離失所，家庭分離，以及對未來的不確定性。</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>心理創傷：</strong> 戰爭帶來的創傷後壓力症候群（PTSD）、焦慮和抑鬱等心理問題，可能顯著影響個人的性慾和親密關係。</li>
+                        <li><strong>生殖健康服務中斷：</strong> 醫療基礎設施受損，導致避孕、產前護理、分娩和性傳播疾病（STD）治療等生殖健康服務的可及性下降。</li>
+                        <li><strong>人口變化：</strong> 戰爭導致出生率下降，死亡率上升，以及大量青壯年人口外流，對國家長期的人口結構產生深遠影響。</li>
+                        <li><strong>家庭重組：</strong> 許多家庭因戰爭而分離或重組，這也影響了傳統的家庭觀念和生殖決策。</li>
+                    </ul>
+                `
+            },
+            "Taiwan": {
+                chineseName: "台灣",
+                population: "約 2340 萬人 (2024年底)",
+                fertility: "每名婦女約 1.25 個孩子 (2024)",
+                rank: "全球最低之一 (約倒數第2位)",
+                details: `
+                    <p>台灣長期面臨地緣政治緊張局勢，儘管沒有直接的武裝衝突，但戰爭威脅的陰影依然影響著社會。這種不確定性對年輕一代的生育意願產生了微妙而重要的影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>未來不確定性：</strong> 對於潛在衝突的擔憂，可能使年輕人對組建家庭和生育後代持謹慎態度，擔心孩子將來的生活環境。</li>
+                        <li><strong>經濟壓力：</strong> 除了地緣政治因素，高昂的生活成本、教育費用和房價也加劇了年輕人的經濟壓力，進一步降低了生育意願。</li>
+                        <li><strong>社會氛圍：</strong> 媒體和公眾對戰爭風險的討論，可能在無形中塑造一種焦慮的社會氛圍，影響個人對未來的規劃。</li>
+                        <li><strong>性別角色與生育觀念：</strong> 傳統性別角色的轉變以及個人主義的興起，也與地緣政治壓力共同作用，影響生育率。</li>
+                    </ul>
+                `
+            },
+            "South Korea": {
+                chineseName: "南韓",
+                population: "約 5180 萬人 (2024年底)",
+                fertility: "每名婦女約 0.75 個孩子 (2024)",
+                rank: "全球最低 (第1位)",
+                details: `
+                    <p>南韓作為一個長期處於南北分裂狀態的國家，其社會生活深受持續的地緣政治緊張局勢影響。儘管經濟高度發展，但南韓面臨著全球最低的生育率之一，這與其獨特的歷史和社會背景密切相關：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>國家安全顧慮：</strong> 與北韓的對峙導致全民兵役制度，以及對國家安全的持續擔憂，這可能間接影響年輕人的生活規劃和生育決策。</li>
+                        <li><strong>極度競爭的社會：</strong> 南韓社會的教育和職場競爭極為激烈，年輕人面臨巨大的學業和職業壓力，導致推遲結婚和生育。</li>
+                        <li><strong>性別不平等：</strong> 儘管有進步，但南韓社會中仍存在性別不平等問題，女性在職場和家庭中面臨雙重負擔，影響其生育意願。</li>
+                        <li><strong>高昂的養育成本：</strong> 養育孩子的成本，特別是教育支出，在南韓非常高昂，成為許多家庭不願生育的重要原因。</li>
+                    </ul>
+                `
+            },
+            "Syria": {
+                chineseName: "敘利亞",
+                population: "約 2467 萬人 (2024)",
+                fertility: "每名婦女約 2.712 個孩子 (2023)",
+                rank: "中等偏高 (約第68位)",
+                details: `
+                    <p>敘利亞經歷了長期的毀滅性內戰，這對其人口、社會結構和生殖健康造成了巨大衝擊：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>大規模流離失所：</strong> 數百萬人成為國內流離失所者或難民，導致家庭分離，社區網絡瓦解。</li>
+                        <li><strong>醫療系統崩潰：</strong> 醫療設施被毀，醫護人員短缺，導致生殖健康服務幾乎無法獲得，孕產婦和嬰兒死亡率急劇上升。</li>
+                        <li><strong>性暴力與剝削：</strong> 衝突中性暴力頻發，婦女和兒童面臨極高的性剝削風險。</li>
+                        <li><strong>心理創傷：</strong> 戰爭創傷普遍存在，嚴重影響個體的心理健康和親密關係。</li>
+                    </ul>
+                `
+            },
+            "Afghanistan": {
+                chineseName: "阿富汗",
+                population: "約 4337 萬人 (2024)",
+                fertility: "每名婦女約 4.43 個孩子 (2024)",
+                rank: "較高 (約第15位)",
+                details: `
+                    <p>阿富汗長期處於衝突和不穩定狀態，加上深厚的傳統社會結構，對性與生殖健康構成獨特挑戰：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>醫療服務不足：</strong> 基礎醫療設施薄弱，尤其是在農村地區，生殖健康服務可及性低。</li>
+                        <li><strong>童婚與早孕：</strong> 童婚和強迫婚姻普遍，導致年輕女孩過早生育，面臨健康風險。</li>
+                        <li><strong>婦女權利受限：</strong> 婦女在教育、就業和醫療方面的權利受限，影響其生殖健康決策能力。</li>
+                        <li><strong>高生育率：</strong> 儘管衝突不斷，但由於缺乏避孕措施、文化偏好和高嬰兒死亡率，生育率依然較高。</li>
+                    </ul>
+                `
+            },
+            "Yemen": {
+                chineseName: "葉門",
+                population: "約 3522 萬人 (2024)",
+                fertility: "每名婦女約 3.36 個孩子 (2024)",
+                rank: "較高 (約第39位)",
+                details: `
+                    <p>葉門正經歷世界上最嚴重的人道危機之一，這對其人口的性與生殖健康造成毀滅性影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>飢荒與疾病：</strong> 營養不良和疾病（包括霍亂）普遍，嚴重影響孕婦和兒童的健康。</li>
+                        <li><strong>醫療系統崩潰：</strong> 醫療設施被毀或缺乏運營資金，導致生殖健康服務幾乎完全癱瘓。</li>
+                        <li><strong>性暴力與童婚：</strong> 衝突加劇了性暴力和童婚現象，使婦女和女孩面臨極端脆弱性。</li>
+                        <li><strong>避孕措施匱乏：</strong> 由於供應鏈中斷和資金不足，避孕措施難以獲得，導致非意願懷孕增加。</li>
+                    </ul>
+                `
+            },
+            "Ethiopia": {
+                chineseName: "衣索比亞",
+                population: "約 1.33 億人 (2024)",
+                fertility: "每名婦女約 3.84 個孩子 (2024)",
+                rank: "較高 (約第27位)",
+                details: `
+                    <p>衣索比亞是非洲人口第二多的國家，儘管面臨地區衝突和發展挑戰，但其人口仍在快速增長：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>地區衝突：</strong> 提格雷等地區的衝突導致人道危機，影響當地居民的健康和生殖服務。</li>
+                        <li><strong>醫療可及性：</strong> 儘管有所改善，但農村地區的醫療服務，包括生殖健康服務，仍然有限。</li>
+                        <li><strong>文化與教育：</strong> 傳統文化和教育水平對生育模式有顯著影響，避孕普及率相對較低。</li>
+                        <li><strong>人口紅利與挑戰：</strong> 龐大的年輕人口帶來發展潛力，但也對教育、就業和醫療資源造成巨大壓力。</li>
+                    </ul>
+                `
+            },
+            "Nigeria": {
+                chineseName: "奈及利亞",
+                population: "約 2.32 億人 (2024)",
+                fertility: "每名婦女約 5.01 個孩子 (2024)",
+                rank: "較高 (約第8位)",
+                details: `
+                    <p>奈及利亞是非洲人口最多的國家，面臨著多重安全挑戰，但人口仍在快速增長：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>博科聖地與綁架：</strong> 北部地區的恐怖主義和綁架事件對當地社區造成巨大影響，包括性暴力和流離失所。</li>
+                        <li><strong>醫療系統壓力：</strong> 龐大的人口和安全問題給本已脆弱的醫療系統帶來巨大壓力，影響生殖健康服務。</li>
+                        <li><strong>貧困與教育：</strong> 貧困和教育水平不足與高生育率密切相關，尤其是在北部地區。</li>
+                        <li><strong>人口增長挑戰：</strong> 快速增長的人口對資源、基礎設施和就業市場構成巨大挑戰。</li>
+                    </ul>
+                `
+            },
+            "Democratic Republic of the Congo": { // 地圖匹配使用英文名稱
+                chineseName: "剛果民主共和國",
+                population: "約 1.032 億人 (2024)",
+                fertility: "每名婦女約 6.05 個孩子 (2023)",
+                rank: "全球最高之一 (約第4位)",
+                details: `
+                    <p>剛果民主共和國長期遭受武裝衝突、貧困和疾病的困擾，這些因素對性與生殖健康產生了毀滅性的影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>長期衝突：</strong> 東部地區的武裝衝突導致大規模流離失所、性暴力和醫療服務中斷。</li>
+                        <li><strong>醫療服務匱乏：</strong> 衝突和貧困導致醫療基礎設施薄弱，生殖健康服務嚴重不足。</li>
+                        <li><strong>性暴力：</strong> 衝突地區的性暴力，包括強姦作為戰爭武器，對受害者的身心健康造成長期傷害，並增加性傳播疾病和非意願懷孕的風險。</li>
+                        <li><strong>高生育率：</strong> 儘管面臨嚴峻挑戰，但由於文化因素、缺乏避孕措施和高死亡率，該國的生育率仍然非常高。</li>
+                    </ul>
+                `
+            },
+            "Sudan": {
+                chineseName: "蘇丹",
+                population: "約 4940 萬人 (2024)",
+                fertility: "每名婦女約 4.10 個孩子 (2024)",
+                rank: "較高 (約第18位)",
+                details: `
+                    <p>蘇丹近期爆發的衝突導致人道危機，對性與生殖健康服務造成嚴重破壞：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>近期衝突：</strong> 2023年爆發的衝突導致人道危機，對生殖健康服務造成嚴重破壞。</li>
+                        <li><strong>人道危機：</strong> 數百萬人流離失所，加劇了性暴力和疾病傳播的風險。</li>
+                        <li><strong>醫療服務匱乏：</strong> 衝突和貧困導致醫療基礎設施薄弱，生殖健康服務嚴重不足。</li>
+                        <li><strong>教育危機：</strong> 大量兒童失學，這將對未來一代的健康和社會發展產生長期影響。。</li>
+                    </ul>
+                `
+            },
+            "Colombia": {
+                chineseName: "哥倫比亞",
+                population: "約 5261 萬人 (2024)",
+                fertility: "每名婦女約 1.71 個孩子 (2024)",
+                rank: "中等偏低 (約第120位)",
+                details: `
+                    <p>哥倫比亞雖然已簽署和平協議，但長期內戰的影響仍在持續，並對性與生殖健康產生複雜影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>衝突後遺症：</strong> 雖然主要衝突結束，但部分地區仍有武裝團體活動，影響醫療服務可及性。</li>
+                        <li><strong>性暴力倖存者：</strong> 衝突期間的性暴力受害者需要長期身心支持和生殖健康服務。</li>
+                        <li><strong>流離失所者：</strong> 國內流離失所者（IDPs）面臨醫療、教育和基本服務的挑戰，包括生殖健康。</li>
+                        <li><strong>青少年懷孕：</strong> 貧困地區的青少年懷孕率仍然較高，這與教育機會和性教育不足有關。</li>
+                    </ul>
+                `
+            },
+            "Venezuela": {
+                chineseName: "委內瑞拉",
+                population: "約 2939 萬人 (2024)",
+                fertility: "每名婦女約 2.17 個孩子 (2024)",
+                rank: "中等 (約第90位)",
+                details: `
+                    <p>委內瑞拉正經歷嚴重的經濟和政治危機，導致大規模的人道主義挑戰，對性與生殖健康造成嚴重衝擊：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>醫療系統崩潰：</strong> 藥品和醫療設備嚴重短缺，醫護人員外流，導致生殖健康服務幾乎癱瘓。</li>
+                        <li><strong>孕產婦死亡率上升：</strong> 由於缺乏基本護理和藥品，孕產婦和新生兒死亡率顯著上升。</li>
+                        <li><strong>避孕措施匱乏：</strong> 由於供應鏈中斷和資金不足，避孕措施難以獲得，導致非意願懷孕和不安全墮胎增加。</li>
+                        <li><strong>大規模移民：</strong> 數百萬人離開國家，對周邊國家的醫療系統和移民自身的健康構成壓力。</li>
+                    </ul>
+                `
+            },
+            "El Salvador": {
+                chineseName: "薩爾瓦多",
+                population: "約 633 萬人 (2024)",
+                fertility: "每名婦女約 2.02 個孩子 (2024)",
+                rank: "中等偏低 (約第97位)",
+                details: `
+                    <p>薩爾瓦多雖然沒有大規模武裝衝突，但長期受幫派暴力影響，這對社會和生殖健康產生間接但深遠的影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>幫派暴力：</strong> 幫派控制地區的居民面臨安全威脅，影響醫療服務的可及性，尤其是在偏遠地區。</li>
+                        <li><strong>強制性行為：</strong> 幫派可能對婦女和女孩實施性暴力或強制性行為，增加性傳播疾病和非意願懷孕的風險。</li>
+                        <li><strong>青少年懷孕：</strong> 幫派暴力、貧困和教育機會不足導致青少年懷孕率居高不下。</li>
+                        <li><strong>移民問題：</strong> 暴力和貧困驅使大量人口移民，這對家庭結構和生殖健康決策產生影響。。</li>
+                    </ul>
+                `
+            },
+            "Iraq": {
+                chineseName: "伊拉克",
+                population: "約 4620 萬人 (2024)",
+                fertility: "每名婦女約 3.55 個孩子 (2024)",
+                rank: "較高 (約第33位)",
+                details: `
+                    <p>伊拉克經歷了數十年的衝突和不穩定，對其人口和社會結構造成了巨大影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>長期衝突與暴力：</strong> 持續的衝突導致大規模流離失所、基礎設施破壞和人道危機。</li>
+                        <li><strong>醫療系統挑戰：</strong> 醫療設施受損，醫護人員短缺，導致生殖健康服務可及性低。</li>
+                        <li><strong>心理健康問題：</strong> 戰爭創傷和不確定性導致普遍的心理健康問題，影響個人關係和生育決策。</li>
+                        <li><strong><strong>人口流動：</strong> 大量人口因安全考量而遷徙，對人口分佈和服務需求產生影響。</li>
+                    </ul>
+                `
+            },
+            "Somalia": {
+                chineseName: "索馬利亞",
+                population: "約 1870 萬人 (2024)",
+                fertility: "每名婦女約 6.09 個孩子 (2024)",
+                rank: "全球最高之一 (約第3位)",
+                details: `
+                    <p>索馬利亞長期處於內戰、乾旱和糧食不安全狀態，是世界上最脆弱的國家之一：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>人道主義危機：</strong> 頻繁的乾旱和衝突導致嚴重的糧食不安全和大規模流離失所。</li>
+                        <li><strong>醫療服務極度匱乏：</strong> 醫療系統幾乎不存在，生殖健康服務（包括產前護理、安全分娩）極度缺乏。</li>
+                        <li><strong>高生育率：</strong> 儘管條件艱苦，但由於缺乏避孕措施、高嬰兒死亡率和文化因素，生育率極高。</li>
+                        <li><strong>性暴力：</strong> 衝突地區的性暴力普遍，婦女和女孩面臨極高風險。</li>
+                    </ul>
+                `
+            },
+            "Central African Republic": {
+                chineseName: "中非共和國",
+                population: "約 590 萬人 (2024)",
+                fertility: "每名婦女約 6.00 個孩子 (2024)",
+                rank: "全球最高之一 (約第5位)",
+                details: `
+                    <p>中非共和國長期受衝突和不穩定困擾，導致嚴重的人道危機和發展挑戰：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>武裝衝突：</strong> 持續的暴力和武裝團體活動導致大規模流離失所和人道援助難以到達。</li>
+                        <li><strong>醫療系統薄弱：</strong> 醫療基礎設施極度不足，生殖健康服務幾乎無法獲得。</li>
+                        <li><strong>性暴力與剝削：</strong> 性暴力被廣泛用作戰爭武器，對婦女和女孩造成毀滅性影響。</li>
+                        <li><strong>高生育率：</strong> 儘管面臨嚴峻挑戰，但由於缺乏避孕措施和傳統因素，生育率居高不下。</li>
+                    </ul>
+                `
+            },
+            "Myanmar": {
+                chineseName: "緬甸",
+                population: "約 5490 萬人 (2024)",
+                fertility: "每名婦女約 2.05 個孩子 (2024)",
+                rank: "中等偏低 (約第95位)",
+                details: `
+                    <p>緬甸長期面臨內部衝突和政治不穩定，對其人口和社會產生深遠影響：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>政治動盪與衝突：</strong> 軍事政變後的持續衝突導致人道危機和醫療服務中斷。</li>
+                        <li><strong>流離失所：</strong> 大量民眾因衝突而流離失所，難以獲得基本服務。</li>
+                        <li><strong>生殖健康挑戰：</strong> 衝突地區的醫療服務受限，影響避孕、產前護理和安全分娩的可及性。</li>
+                        <li><strong>性別暴力：</strong> 衝突中性暴力風險增加，特別是對少數民族婦女。</li>
+                    </ul>
+                `
+            },
+            "Haiti": {
+                chineseName: "海地",
+                population: "約 1180 萬人 (2024)",
+                fertility: "每名婦女約 2.65 個孩子 (2024)",
+                rank: "中等偏高 (約第72位)",
+                details: `
+                    <p>海地長期面臨政治不穩定、自然災害和幫派暴力，這些因素嚴重影響其社會和健康狀況：</p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1 mt-2">
+                        <li><strong>幫派暴力與不安全：</strong> 日益嚴重的幫派暴力導致大規模流離失所，醫療和人道援助難以到達。</li>
+                        <li><strong>醫療系統崩潰：</strong> 基礎設施薄弱，醫療服務因暴力和資源匱乏而頻繁中斷。</li>
+                        <li><strong>性暴力：</strong> 幫派控制地區性暴力頻發，對婦女和女孩的生殖健康造成嚴重威脅。</li>
+                        <li><strong>糧食不安全：</strong> 政治動盪加劇糧食不安全，影響孕婦和兒童的營養狀況。</li>
+                    </ul>
+                `
+            }
+        };
+
+        // 地圖和彈出視窗功能的 JavaScript
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("[Init] DOMContentLoaded 事件已觸發。");
+
+            const svg = d3.select("#world-map");
+            const mapContainer = document.getElementById('map-container');
+            let width = mapContainer.offsetWidth;
+            let height = mapContainer.offsetHeight;
+
+            // 設定地圖投影和路徑的函數
+            const setupMap = () => {
+                console.log("[Map Setup] 正在設定地圖。");
+                width = mapContainer.offsetWidth;
+                height = mapContainer.offsetHeight;
+
+                // 更新 SVG 尺寸
+                svg.attr("width", width).attr("height", height);
+
+                const projection = d3.geoMercator()
+                    .scale(width / 2 / Math.PI)
+                    .translate([width / 2, height / 1.5]);
+
+                const path = d3.geoPath().projection(projection);
+
+                // 清除之前的路徑以避免在調整大小時重複
+                svg.selectAll("path").remove();
+                console.log("[Map Setup] 舊地圖路徑已清除。");
+
+                // 載入世界地圖數據
+                d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(world => {
+                    console.log("[Map Data] 世界地圖數據已載入。");
+                    const countries = topojson.feature(world, world.objects.countries).features;
+
+                    svg.selectAll("path")
+                        .data(countries)
+                        .enter().append("path")
+                        .attr("class", d => {
+                            const countryName = d.properties.name;
+                            // 偵錯：顯示D3讀取到的國家名稱
+                            // console.log("D3讀取到的國家名稱:", countryName); // 避免過多訊息，此行暫時註釋
+                            // 如果國家在我們的數據中，則添加 'highlight' 類別
+                            if (countryData[countryName]) {
+                                return "country highlight";
+                            }
+                            return "country";
+                        })
+                        .attr("d", path)
+                        .on("click", function(event, d) {
+                            const countryName = d.properties.name;
+                            // 偵錯：點擊的國家名稱
+                            console.log("[Map Click] 點擊了地圖上的國家:", countryName);
+                            if (countryData[countryName]) {
+                                openModal(countryName);
+                            } else {
+                                console.warn("[Map Click] 未找到該國家數據或名稱不匹配:", countryName);
+                            }
+                        });
+                }).catch(error => {
+                    console.error("[Map Error] 載入地圖數據時出錯：", error);
+                    // 地圖載入失敗時的備用訊息
+                    mapContainer.innerHTML = '<p class="text-red-500 text-center p-4">無法載入世界地圖。請檢查您的網路連線或稍後再試。</p>';
+                });
+            };
+
+            // 初始地圖設定
+            setupMap();
+
+            // 處理視窗大小調整以使地圖響應式
+            window.addEventListener('resize', setupMap);
+
+
+            // 彈出視窗功能
+            const modal = document.getElementById("countryModal");
+            const backToMapButton = document.getElementById("backToMapButton"); // 使用 ID 選擇器
+            const modalContent = document.querySelector(".modal-content"); // 獲取內容元素
+            const modalCountryName = document.getElementById("modalCountryName");
+            const modalCountryPopulation = document.getElementById("modalCountryPopulation");
+            const modalCountryFertility = document.getElementById("modalCountryFertility");
+            const modalCountryRank = document.getElementById("modalCountryRank");
+            const modalCountryDetails = document.getElementById("modalCountryDetails");
+
+            // 顯示彈出視窗的函數
+            function openModal(countryName) {
+                const data = countryData[countryName];
+                if (data) {
+                    modalCountryName.textContent = data.chineseName; // 顯示中文國名
+                    modalCountryPopulation.innerHTML = `<strong>人口:</strong> ${data.population}`;
+                    modalCountryFertility.innerHTML = `<strong>生育率:</strong> ${data.fertility}`;
+                    modalCountryRank.innerHTML = `<strong>生育率世界排名:</strong> ${data.rank}`;
+                    modalCountryDetails.innerHTML = data.details;
+                    modal.style.display = 'flex'; // 直接設置為 flex 顯示
+                    document.body.classList.add('modal-open'); // 鎖定背景滾動
+                    console.log(`[Modal Open] 彈出視窗已為 ${countryName} 開啟。`); // 調試訊息
+                } else {
+                    console.warn(`[Modal Open] 嘗試開啟模態框，但未找到國家數據: ${countryName}`);
+                }
+            }
+
+            // 關閉彈出視窗的函數
+            function closeModal() {
+                modal.style.display = 'none'; // 直接設置為 none 隱藏
+                document.body.classList.remove('modal-open'); // 解鎖背景滾動
+                console.log("[Modal Close] 彈出視窗已關閉。"); // 調試訊息
+            }
+
+            // 點擊「回到地圖」按鈕
+            backToMapButton.addEventListener('click', function(event) {
+                console.log("[Button Click] 點擊了 '回到地圖' 按鈕。");
+                event.stopPropagation(); // 阻止事件冒泡，防止觸發 modal 的點擊事件
+                closeModal();
+            });
+
+            // 點擊彈出視窗外部（背景）關閉
+            modal.addEventListener('click', function(event) {
+                // 確保點擊事件的目標是模態背景本身，而不是模態內容
+                if (event.target === modal) {
+                    console.log("[Modal Background Click] 點擊了模態背景。");
+                    closeModal();
+                } else {
+                    console.log("[Modal Background Click] 點擊了模態內部，未關閉。目標:", event.target);
+                }
+            });
+
+            // 阻止模態內容內的點擊事件冒泡到模態背景
+            modalContent.addEventListener('click', function(event) {
+                console.log("[Modal Content Click] 點擊了模態內容。阻止冒泡。");
+                event.stopPropagation(); // 阻止內容點擊事件冒泡到 modal 元素
+            });
+        });
+    </script>
+</body>
+</html>
+
